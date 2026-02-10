@@ -1,0 +1,191 @@
+================================================================================
+              WINDOWS SYSADMIN COMMAND REFERENCE
+================================================================================
+
+  PowerShell commands marked (PS). All others work in CMD or both.
+  Run as Administrator for most commands.
+
+================================================================================
+  SYSTEM INFO & NAVIGATION
+================================================================================
+
+  hostname                                  Show this computer's name
+  whoami                                    Show current logged-in user
+  whoami /priv                              Show your current privileges
+  systeminfo                                Full system details (OS, RAM, uptime, patches)
+  systeminfo | findstr /i "boot"            Show last boot time
+  winver                                    Open Windows version dialog
+  ver                                       Show OS version in CMD
+  $PSVersionTable                           Show PowerShell version (PS)
+  Get-ComputerInfo                          Detailed system info (PS)
+  cd C:\path\to\folder                      Change directory
+  dir                                       List files in current directory
+  Get-ChildItem -Force                      List all files including hidden (PS)
+  cls                                       Clear the screen
+  tree /F                                   Show folder structure with files
+
+================================================================================
+  USER ACCOUNTS (LOCAL)
+================================================================================
+
+  net user                                  List all local user accounts
+  net user username                         Show details for a specific user
+  net user username /active:no              Disable a local account
+  net user username * /domain               Reset domain user password (prompts)
+  net localgroup administrators             List local admin group members
+  net localgroup administrators user /add   Add user to local admins
+  Get-LocalUser                             List local users (PS)
+  Get-LocalGroupMember Administrators       List local admins (PS)
+  query user                                Show logged-in users on this machine
+  qwinsta /server:PC-NAME                   Show sessions on a remote machine
+  logoff SESSION_ID                         Log off a user session
+
+================================================================================
+  NETWORKING
+================================================================================
+
+  ipconfig                                  Show IP addresses for all adapters
+  ipconfig /all                             Detailed network config (DNS, DHCP, MAC)
+  ipconfig /flushdns                        Clear local DNS cache
+  ipconfig /release                         Release current DHCP IP address
+  ipconfig /renew                           Request new DHCP IP address
+  ping 8.8.8.8                              Test basic internet connectivity
+  ping hostname -t                          Continuous ping (Ctrl+C to stop)
+  tracert 8.8.8.8                           Trace route to destination
+  nslookup domain.com                       DNS lookup for a domain
+  nslookup domain.com 8.8.8.8              DNS lookup against specific server
+  netstat -ano                              Show all connections with PIDs
+  netstat -ano | findstr :445               Find what's using a specific port
+  arp -a                                    Show ARP table (IP to MAC mappings)
+  Get-NetAdapter                            List network adapters (PS)
+  Get-DnsClientCache                        View DNS cache entries (PS)
+  Test-NetConnection host -Port 443         Test specific port connectivity (PS)
+  Resolve-DnsName domain.com                DNS lookup (PS)
+
+================================================================================
+  ACTIVE DIRECTORY
+================================================================================
+
+  Get-ADUser -Identity username                                     Get AD user details
+  Get-ADUser -Identity username -Properties *                       Get ALL properties for a user
+  Get-ADUser -Filter {Enabled -eq $false}                           List all disabled AD accounts
+  Search-ADAccount -AccountInactive -TimeSpan 90.00:00:00           Find accounts inactive 90+ days
+  Search-ADAccount -PasswordExpired                                 Find accounts with expired passwords
+  Search-ADAccount -LockedOut                                       Find locked-out accounts
+  Unlock-ADAccount -Identity username                               Unlock a locked-out account
+  Disable-ADAccount -Identity username                              Disable an AD account
+  Get-ADGroupMember "Domain Admins"                                 List Domain Admins group members
+  Get-ADPrincipalGroupMembership username                           List all groups a user belongs to
+  Get-ADUser -Filter * -Properties PasswordLastSet | Sort PasswordLastSet   Audit password ages
+  Get-ADComputer -Filter * -Properties LastLogonDate | Sort LastLogonDate   Find stale computer objects
+  Get-ADDefaultDomainPasswordPolicy                                 Show domain password policy
+  dcdiag /v                                                         Domain controller health check (verbose)
+  repadmin /replsummary                                             AD replication status summary
+  repadmin /showrepl                                                Detailed replication status per DC
+  repadmin /syncall /AdeP                                           Force sync all DCs
+  nltest /dsgetdc:domain.com                                        Find which DC a machine is using
+
+================================================================================
+  SERVICES & PROCESSES
+================================================================================
+
+  Get-Service                                           List all services (PS)
+  Get-Service | Where Status -eq Running                List running services (PS)
+  Get-Service -Name servicename                         Check specific service status
+  Restart-Service -Name servicename -Force              Restart a service
+  Stop-Service -Name servicename -Force                 Stop a service
+  sc query servicename                                  Query service status (CMD)
+  tasklist                                              List all running processes
+  tasklist /svc                                         List processes with their services
+  taskkill /PID 1234 /F                                 Force kill process by PID
+  taskkill /IM process.exe /F                           Force kill process by name
+  Get-Process | Sort CPU -Descending | Select -First 10 Top 10 CPU-consuming processes (PS)
+
+================================================================================
+  REMOTE MANAGEMENT
+================================================================================
+
+  Enter-PSSession -ComputerName PC-NAME                             Start interactive remote PS session
+  Exit-PSSession                                                    End remote PS session
+  Invoke-Command -ComputerName PC-NAME -ScriptBlock { command }     Run a command on a remote machine
+  mstsc /v:PC-NAME                                                  Open Remote Desktop to a machine
+  shutdown /r /m \\PC-NAME /t 60 /c "Reason"                       Remote reboot with 60s warning
+  shutdown /s /m \\PC-NAME /t 0 /f                                  Remote shutdown immediately
+  shutdown /a /m \\PC-NAME                                          Abort pending remote shutdown
+  gpupdate /force                                                   Force Group Policy refresh (local)
+  Invoke-GPUpdate -Computer PC-NAME -Force                          Force GP refresh on remote machine (PS)
+  gpresult /r                                                       Show applied Group Policies (local)
+  gpresult /s PC-NAME /r                                            Show applied GPs on remote machine
+
+================================================================================
+  DISK & FILE MANAGEMENT
+================================================================================
+
+  Get-PSDrive -PSProvider FileSystem                                Show drives and free space (PS)
+  wmic logicaldisk get size,freespace,caption                       Drive space summary (CMD)
+  chkdsk C: /F                                                      Check and fix disk errors (needs reboot)
+  sfc /scannow                                                      System file integrity check
+  DISM /Online /Cleanup-Image /RestoreHealth                        Repair Windows component store
+  robocopy source dest /E /ZB /R:3 /W:5 /LOG:copy.log              Robust file copy with retry and logging
+  icacls "C:\path" /grant user:(OI)(CI)F                            Grant full NTFS permissions
+  icacls "C:\path" /remove user                                     Remove NTFS permissions for a user
+  Get-SmbShare                                                      List active SMB shares (PS)
+  Get-SmbOpenFile                                                   Show files open over SMB (PS)
+  net share                                                         List shared folders (CMD)
+  net use                                                           List mapped drives
+
+================================================================================
+  SECURITY & AUDITING
+================================================================================
+
+  Get-WinEvent -LogName Security -MaxEvents 50                      View last 50 security events (PS)
+  Get-WinEvent -FilterHashtable @{LogName='Security';Id=4625} -MaxEvents 20   Last 20 failed logons
+  Get-WinEvent -FilterHashtable @{LogName='Security';Id=4720}      Audit new account creation events
+  Get-WinEvent -FilterHashtable @{LogName='System';Id=1074}        Find shutdown/reboot events
+  wevtutil qe Security /c:10 /f:text /rd:true                      Last 10 security events (CMD)
+  Get-NetFirewallRule | Where Enabled -eq True | Select DisplayName,Direction,Action   List active firewall rules (PS)
+  netsh advfirewall show allprofiles                                Show firewall profile status
+  Get-SmbServerConfiguration | Select EnableSMB1Protocol            Check if SMBv1 is enabled
+  Set-SmbServerConfiguration -EnableSMB1Protocol $false -Force      Disable SMBv1 (requires restart)
+  cipher /u /n                                                      List files encrypted with EFS
+  Get-BitLockerVolume                                               Check BitLocker status on all drives
+  manage-bde -status                                                BitLocker status (CMD alternative)
+
+================================================================================
+  WINDOWS UPDATE & PATCHES
+================================================================================
+
+  Get-HotFix | Sort InstalledOn -Desc | Select -First 10           Last 10 installed patches (PS)
+  wmic qfe list brief /format:table                                 List installed updates (CMD)
+  Get-WindowsUpdateLog                                              Generate readable Windows Update log
+  usoclient StartScan                                               Trigger update scan
+  usoclient StartInstall                                            Trigger update install
+
+================================================================================
+  ENTRA / M365 (POWERSHELL MODULES)
+================================================================================
+
+  Install-Module AzureAD -Force                                     Install Azure AD PowerShell module
+  Install-Module Microsoft.Graph -Force                             Install Microsoft Graph PS module
+  Connect-AzureAD                                                   Connect to Azure AD (interactive)
+  Connect-MgGraph -Scopes "User.Read.All"                           Connect to MS Graph
+  Get-AzureADUser -All $true | Where {$_.AccountEnabled -eq $false} List disabled Entra users
+  Get-AzureADDirectoryRole | Get-AzureADDirectoryRoleMember         Audit Entra admin role assignments
+  Get-MgUser -Filter "signInActivity/lastSignInDateTime le 2024-01-01"   Find stale Entra sign-ins (Graph)
+
+================================================================================
+  QUICK TROUBLESHOOTING
+================================================================================
+
+  ping DC-NAME                                                      Test DC connectivity
+  nslookup _ldap._tcp.dc._msdcs.domain.com                         Verify DNS SRV records for AD
+  nltest /sc_verify:domain.com                                      Verify secure channel to domain
+  Test-ComputerSecureChannel -Repair                                Repair machine trust relationship (PS)
+  klist                                                             Show current Kerberos tickets
+  klist purge                                                       Purge Kerberos tickets (forces re-auth)
+  netdom verify PC-NAME /domain:domain.com                          Verify machine account in domain
+  w32tm /query /status                                              Check time sync status
+  w32tm /resync /force                                              Force time resync (critical for Kerberos)
+
+================================================================================
+
