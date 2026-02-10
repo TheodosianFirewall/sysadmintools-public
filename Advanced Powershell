@@ -1,0 +1,458 @@
+================================================================================
+          WINDOWS SYSADMIN COMMAND REFERENCE — ADVANCED
+================================================================================
+
+  PowerShell commands marked (PS). All others work in CMD or both.
+  Run as Administrator for all commands unless noted otherwise.
+
+################################################################################
+  PART 1: INSTALLING FEATURES, ROLES & TOOLS
+################################################################################
+
+================================================================================
+  WINDOWS FEATURES & ROLES (Server)
+================================================================================
+
+  Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools       Install AD DS role
+  Install-WindowsFeature -Name DNS -IncludeManagementTools                      Install DNS Server role
+  Install-WindowsFeature -Name DHCP -IncludeManagementTools                     Install DHCP Server role
+  Install-WindowsFeature -Name GPMC                                             Install Group Policy Management Console
+  Install-WindowsFeature -Name RSAT-AD-Tools                                    Install AD admin tools (ADUC, etc.)
+  Install-WindowsFeature -Name RSAT-DNS-Server                                  Install DNS management tools
+  Install-WindowsFeature -Name RSAT-DHCP                                        Install DHCP management tools
+  Install-WindowsFeature -Name Telnet-Client                                    Install Telnet client (testing only)
+  Install-WindowsFeature -Name Windows-Server-Backup                            Install Windows Server Backup
+  Install-WindowsFeature -Name BitLocker                                        Install BitLocker on Server
+  Get-WindowsFeature | Where Installed                                          List all installed roles/features
+  Get-WindowsFeature | Where Name -like "*RSAT*"                                List available RSAT tools
+
+================================================================================
+  WINDOWS FEATURES (Workstation / Windows 10/11)
+================================================================================
+
+  Add-WindowsCapability -Online -Name Rsat.ActiveDirectory.DS-LDS.Tools~~~~0.0.1.0      Install RSAT AD tools
+  Add-WindowsCapability -Online -Name Rsat.Dns.Tools~~~~0.0.1.0                          Install RSAT DNS tools
+  Add-WindowsCapability -Online -Name Rsat.DHCP.Tools~~~~0.0.1.0                         Install RSAT DHCP tools
+  Add-WindowsCapability -Online -Name Rsat.GroupPolicy.Management.Tools~~~~0.0.1.0       Install RSAT Group Policy tools
+  Add-WindowsCapability -Online -Name Rsat.CertificateServices.Tools~~~~0.0.1.0          Install RSAT Certificate tools
+  Get-WindowsCapability -Online | Where Name -like "*RSAT*" | Select Name,State          List all RSAT install status
+  Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All               Install Hyper-V (needs reboot)
+  Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux   Install WSL
+  dism /online /enable-feature /featurename:TelnetClient                                 Install Telnet client (CMD)
+  Get-WindowsOptionalFeature -Online | Where State -eq Enabled                           List enabled optional features
+
+================================================================================
+  POWERSHELL MODULE INSTALLS
+================================================================================
+
+  Install-Module Microsoft.Graph -Force -Scope AllUsers             MS Graph API (replacement for AzureAD)
+  Install-Module AzureAD -Force                                     Azure AD module (deprecated, use Graph)
+  Install-Module ExchangeOnlineManagement -Force                    Exchange Online management
+  Install-Module Microsoft.Online.SharePoint.PowerShell -Force      SharePoint Online management
+  Install-Module MicrosoftTeams -Force                              Teams administration
+  Install-Module PSWindowsUpdate -Force                             Windows Update management module
+  Install-Module ImportExcel -Force                                 Read/write Excel without Office installed
+  Install-Module Posh-SSH -Force                                    SSH from PowerShell
+  Install-Module ActiveDirectory -Force                             AD module (if not from RSAT)
+  Get-InstalledModule                                               List all installed PS modules
+  Update-Module -Name ModuleName                                    Update a specific module
+  Find-Module -Name *keyword*                                       Search PowerShell Gallery
+
+================================================================================
+  COMMON TOOL INSTALLS (WINGET — built into Win 10/11)
+================================================================================
+
+  winget install Microsoft.PowerShell                               Install PowerShell 7 (latest)
+  winget install Microsoft.WindowsTerminal                          Install Windows Terminal
+  winget install Notepad++.Notepad++                                Install Notepad++
+  winget install WiresharkFoundation.Wireshark                      Install Wireshark (packet capture)
+  winget install PuTTY.PuTTY                                        Install PuTTY (SSH/Telnet client)
+  winget install WinSCP.WinSCP                                      Install WinSCP (SFTP/SCP client)
+  winget install voidtools.Everything                               Install Everything (instant file search)
+  winget install Sysinternals.Sysinternals                          Install full Sysinternals Suite
+  winget install 7zip.7zip                                          Install 7-Zip
+  winget install Git.Git                                            Install Git
+  winget install Microsoft.VisualStudioCode                         Install VS Code
+  winget install Nmap.Nmap                                          Install Nmap (network scanner)
+  winget install Greenshot.Greenshot                                Install Greenshot (screenshots)
+  winget list                                                       List all winget-managed apps
+  winget upgrade --all                                              Update all winget-managed apps
+  winget search keyword                                             Search for available packages
+
+================================================================================
+  CHOCOLATEY PACKAGE MANAGER (alternative to winget)
+================================================================================
+
+  Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+      ^ One-liner to install Chocolatey (run in elevated PS)
+
+  choco install sysinternals -y                                     Install Sysinternals Suite
+  choco install bginfo -y                                           Install BGInfo (desktop system info)
+  choco install treesizefree -y                                     Install TreeSize Free (disk usage)
+  choco install mremoteng -y                                        Install mRemoteNG (multi-remote client)
+  choco install advanced-ip-scanner -y                              Install Advanced IP Scanner
+  choco upgrade all -y                                              Update all Chocolatey packages
+
+################################################################################
+  PART 2: ADVANCED ADMINISTRATION
+################################################################################
+
+================================================================================
+  ADVANCED ACTIVE DIRECTORY
+================================================================================
+
+  Get-ADUser -Filter * -Properties LastLogonDate,PasswordLastSet,Enabled |
+    Where {$_.LastLogonDate -lt (Get-Date).AddDays(-90) -and $_.Enabled -eq $true} |
+    Select Name,LastLogonDate,PasswordLastSet |
+    Export-Csv C:\stale_users.csv -NoTypeInformation
+      ^ Export enabled users who haven't logged in for 90 days
+
+  Get-ADUser -Filter {AdminCount -eq 1} -Properties AdminCount,MemberOf |
+    Select Name,SamAccountName
+      ^ Find accounts with elevated AD privileges (AdminCount flag)
+
+  Get-ADUser -Filter * -Properties ServicePrincipalName |
+    Where {$_.ServicePrincipalName -ne $null} |
+    Select Name,SamAccountName,ServicePrincipalName
+      ^ Find Kerberoastable accounts (accounts with SPNs set)
+
+  Get-ADObject -Filter {ObjectClass -eq "computer"} -SearchBase "CN=Computers,DC=domain,DC=com"
+      ^ Find computer objects still in the default Computers container (not in OUs)
+
+  Get-ADUser -Filter * -Properties PasswordNeverExpires |
+    Where {$_.PasswordNeverExpires -eq $true -and $_.Enabled -eq $true} |
+    Select Name,SamAccountName
+      ^ Find enabled accounts with non-expiring passwords
+
+  Get-ADUser -Filter {SIDHistory -like "*"} -Properties SIDHistory
+      ^ Find accounts with SID History (potential privilege escalation)
+
+  Get-GPOReport -All -ReportType HTML -Path C:\GPO_Report.html
+      ^ Export all GPOs to a single HTML report for review
+
+  Get-GPO -All | Where {$_.GpoStatus -ne "AllSettingsEnabled"} |
+    Select DisplayName,GpoStatus
+      ^ Find GPOs that are partially or fully disabled
+
+  Get-ADOrganizationalUnit -Filter * | Select Name,DistinguishedName
+      ^ List all OUs in the domain
+
+  Get-ADFineGrainedPasswordPolicy -Filter *
+      ^ List all fine-grained password policies
+
+  Set-ADDefaultDomainPasswordPolicy -Identity domain.com -MinPasswordLength 14 -LockoutThreshold 5 -LockoutDuration 00:30:00 -LockoutObservationWindow 00:30:00
+      ^ Set domain password policy (plan and communicate before running)
+
+================================================================================
+  ADVANCED GROUP POLICY
+================================================================================
+
+  gpresult /h C:\gpreport.html                                     Generate GP report as HTML (local)
+  gpresult /s PC-NAME /h C:\gpreport.html /user domain\username    GP report for specific user on remote PC
+  Get-GPResultantSetOfPolicy -Computer PC-NAME -ReportType HTML -Path C:\rsop.html   RSoP report (PS)
+  Backup-GPO -All -Path C:\GPO_Backups                             Backup all GPOs
+  Get-GPInheritance -Target "OU=Workstations,DC=domain,DC=com"     Check GP inheritance for an OU
+
+================================================================================
+  ADVANCED NETWORKING & DIAGNOSTICS
+================================================================================
+
+  Get-NetTCPConnection | Where State -eq Established |
+    Select LocalAddress,LocalPort,RemoteAddress,RemotePort,OwningProcess |
+    Sort RemoteAddress
+      ^ List all established TCP connections with owning process
+
+  Get-NetTCPConnection | Where {$_.RemotePort -eq 445} |
+    Select RemoteAddress,OwningProcess
+      ^ Find all machines with active SMB connections to this host
+
+  Get-NetIPAddress | Where AddressFamily -eq IPv4 |
+    Select InterfaceAlias,IPAddress,PrefixLength
+      ^ Clean list of IPv4 addresses on all interfaces
+
+  Get-DnsServerZone                                                 List all DNS zones (on DNS server)
+  Get-DnsServerResourceRecord -ZoneName domain.com -RRType A       List all A records in a zone
+  Add-DnsServerResourceRecordA -ZoneName domain.com -Name host -IPv4Address 10.0.0.50   Add an A record
+  Remove-DnsServerResourceRecord -ZoneName domain.com -Name host -RRType A -Force       Remove an A record
+  Clear-DnsServerCache                                              Clear DNS server cache
+
+  Test-NetConnection -ComputerName host -Port 3389 -InformationLevel Detailed   Detailed port test (PS)
+  pathping target                                                   Combined tracert + ping with loss stats
+  netsh interface ip show config                                    Show all interface IP configs
+  netsh wlan show profiles                                          List saved WiFi profiles
+  netsh wlan show profile name="SSID" key=clear                    Show saved WiFi password in clear text
+
+  Get-NetFirewallRule -Direction Inbound -Enabled True -Action Allow |
+    Select DisplayName,Profile,LocalPort,Protocol |
+    Sort LocalPort
+      ^ List all inbound allow rules sorted by port
+
+  New-NetFirewallRule -DisplayName "Block Telnet" -Direction Inbound -Protocol TCP -LocalPort 23 -Action Block
+      ^ Create a firewall rule to block inbound Telnet
+
+  Get-NetRoute | Where DestinationPrefix -ne "0.0.0.0/0" |
+    Select DestinationPrefix,NextHop,InterfaceAlias
+      ^ Show routing table (excluding default route)
+
+================================================================================
+  ADVANCED SECURITY & AUDITING
+================================================================================
+
+  Get-WinEvent -FilterHashtable @{LogName='Security';Id=4648} -MaxEvents 20
+      ^ Explicit credential logon events (pass-the-hash indicator)
+
+  Get-WinEvent -FilterHashtable @{LogName='Security';Id=4672} -MaxEvents 20
+      ^ Special privilege assignments (admin logons)
+
+  Get-WinEvent -FilterHashtable @{LogName='Security';Id=4624} -MaxEvents 50 |
+    Where {$_.Properties[8].Value -eq 10} |
+    Select TimeCreated,@{N='User';E={$_.Properties[5].Value}},@{N='Source';E={$_.Properties[18].Value}}
+      ^ Remote interactive logons (RDP — LogonType 10)
+
+  Get-WinEvent -FilterHashtable @{LogName='Security';Id=4625} |
+    Group-Object {$_.Properties[5].Value} |
+    Sort Count -Descending |
+    Select Count,Name
+      ^ Failed logons grouped by username (brute force detection)
+
+  Get-WinEvent -FilterHashtable @{LogName='Security';Id=4688} -MaxEvents 50 |
+    Select TimeCreated,@{N='Process';E={$_.Properties[5].Value}},@{N='User';E={$_.Properties[1].Value}}
+      ^ New process creation events (requires audit policy enabled)
+
+  Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-PowerShell/Operational';Id=4104} -MaxEvents 20
+      ^ PowerShell script block logging (see what scripts ran)
+
+  auditpol /get /category:*                                         Show all audit policy settings
+  auditpol /set /subcategory:"Logon" /success:enable /failure:enable     Enable logon auditing
+  auditpol /set /subcategory:"Process Creation" /success:enable          Enable process creation auditing
+
+  Get-ScheduledTask | Where State -eq Ready |
+    Select TaskName,TaskPath,@{N='Actions';E={$_.Actions.Execute}} |
+    Sort TaskPath
+      ^ List all active scheduled tasks with their executables (persistence check)
+
+  Get-CimInstance Win32_StartupCommand | Select Name,Command,Location,User
+      ^ List all startup programs (persistence check)
+
+  Get-ItemProperty HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run
+      ^ Check Run registry key for persistence
+
+  Get-ItemProperty HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce
+      ^ Check RunOnce registry key
+
+  Get-Service | Where {$_.StartType -eq "Automatic" -and $_.Status -ne "Running"} |
+    Select Name,DisplayName,Status
+      ^ Find auto-start services that aren't running (may indicate tampering)
+
+================================================================================
+  CERTIFICATE MANAGEMENT
+================================================================================
+
+  Get-ChildItem Cert:\LocalMachine\My                               List machine personal certificates
+  Get-ChildItem Cert:\LocalMachine\Root                             List trusted root CAs
+  Get-ChildItem Cert:\LocalMachine\My | Where NotAfter -lt (Get-Date).AddDays(30)   Certs expiring in 30 days
+  certutil -store My                                                List personal cert store (CMD)
+  certutil -verifystore My                                          Verify all certs in personal store
+  certutil -urlcache -split -f http://url/cert.cer C:\cert.cer     Download a certificate file
+
+================================================================================
+  DISK, STORAGE & FILE ADVANCED
+================================================================================
+
+  Get-Volume | Select DriveLetter,FileSystemLabel,SizeRemaining,Size |
+    Format-Table -AutoSize
+      ^ Clean volume summary with free space
+
+  Get-PhysicalDisk | Select FriendlyName,MediaType,Size,HealthStatus
+      ^ Physical disk health check
+
+  Get-Disk | Select Number,FriendlyName,PartitionStyle,Size,OperationalStatus
+      ^ List all disks with partition info
+
+  Get-SmbOpenFile | Select ClientComputerName,ClientUserName,Path
+      ^ Who has what files open over the network
+
+  Close-SmbOpenFile -FileId 12345 -Force
+      ^ Force close a file locked over SMB (get FileId from Get-SmbOpenFile)
+
+  Get-ChildItem C:\ -Recurse -ErrorAction SilentlyContinue |
+    Sort Length -Descending |
+    Select -First 20 FullName,@{N='SizeMB';E={[math]::Round($_.Length/1MB,2)}}
+      ^ Find 20 largest files on C: drive
+
+  Get-ChildItem C:\Users -Recurse -Include *.pst,*.ost -ErrorAction SilentlyContinue |
+    Select FullName,@{N='SizeMB';E={[math]::Round($_.Length/1MB,2)}}
+      ^ Find Outlook data files (useful for migrations)
+
+  compact /c /s:C:\folder /i                                        Enable NTFS compression on a folder
+  fsutil volume diskfree C:                                         Precise disk free space
+
+================================================================================
+  HYPER-V (if installed)
+================================================================================
+
+  Get-VM                                                            List all VMs
+  Get-VM | Select Name,State,CPUUsage,MemoryAssigned                VM status overview
+  Start-VM -Name "VM-Name"                                          Start a VM
+  Stop-VM -Name "VM-Name" -Force                                    Force stop a VM
+  Checkpoint-VM -Name "VM-Name" -SnapshotName "Pre-change"          Create a snapshot
+  Get-VMSnapshot -VMName "VM-Name"                                  List snapshots for a VM
+  Export-VM -Name "VM-Name" -Path C:\VMExports                      Export a VM for backup/migration
+
+================================================================================
+  EXCHANGE ONLINE / M365 MAIL
+================================================================================
+
+  Connect-ExchangeOnline                                            Connect to Exchange Online
+  Get-Mailbox -ResultSize Unlimited | Select DisplayName,PrimarySmtpAddress,RecipientType
+      ^ List all mailboxes
+
+  Get-MailboxPermission -Identity user@domain.com |
+    Where {$_.IsInherited -eq $false -and $_.User -ne "NT AUTHORITY\SELF"}
+      ^ Audit who has access to a mailbox (non-inherited)
+
+  Get-MailboxFolderPermission -Identity user@domain.com:\Calendar
+      ^ Check calendar sharing permissions
+
+  Search-UnifiedAuditLog -StartDate (Get-Date).AddDays(-7) -EndDate (Get-Date) -Operations "FileDownloaded","FileAccessed" -ResultSize 100
+      ^ Audit file access in SharePoint/OneDrive last 7 days
+
+  Get-TransportRule | Select Name,State,Priority
+      ^ List all mail flow rules
+
+  Get-QuarantineMessage -StartReceivedDate (Get-Date).AddDays(-7)
+      ^ View quarantined messages from last 7 days
+
+  Get-AtpPolicyForO365                                              Check ATP/Safe Links policy
+  Get-AntiPhishPolicy                                               Check anti-phishing policies
+
+================================================================================
+  MICROSOFT GRAPH (ENTRA ADVANCED)
+================================================================================
+
+  Connect-MgGraph -Scopes "User.Read.All","AuditLog.Read.All","Directory.Read.All"
+      ^ Connect with common admin scopes
+
+  Get-MgUser -All | Where {$_.AccountEnabled -eq $true} |
+    Select DisplayName,UserPrincipalName,LastSignInDateTime
+      ^ List all enabled users with last sign-in
+
+  Get-MgDirectoryRole | ForEach {
+    $role = $_; Get-MgDirectoryRoleMember -DirectoryRoleId $_.Id |
+    Select @{N='Role';E={$role.DisplayName}},@{N='User';E={$_.AdditionalProperties.displayName}}
+  }
+      ^ Full audit of all Entra admin role assignments
+
+  Get-MgIdentityConditionalAccessPolicy | Select DisplayName,State
+      ^ List all Conditional Access policies and their status
+
+  Get-MgAuditLogSignIn -Top 50 -Filter "status/errorCode ne 0" |
+    Select UserDisplayName,AppDisplayName,Status,CreatedDateTime
+      ^ Last 50 failed sign-ins across Entra
+
+  Get-MgAuditLogDirectoryAudit -Top 50 |
+    Select ActivityDisplayName,InitiatedBy,TargetResources,ActivityDateTime
+      ^ Last 50 directory changes (user/group/role modifications)
+
+================================================================================
+  PERFORMANCE & RESOURCE MONITORING
+================================================================================
+
+  Get-Counter '\Processor(_Total)\% Processor Time' -SampleInterval 2 -MaxSamples 5
+      ^ CPU usage over 10 seconds
+
+  Get-Counter '\Memory\Available MBytes'
+      ^ Current available RAM
+
+  Get-Counter '\LogicalDisk(C:)\% Free Space'
+      ^ C: drive free space percentage
+
+  Get-Counter '\Network Interface(*)\Bytes Total/sec'
+      ^ Network throughput per interface
+
+  Get-Process | Sort WorkingSet64 -Descending | Select -First 10 Name,@{N='MemMB';E={[math]::Round($_.WorkingSet64/1MB)}}
+      ^ Top 10 memory-consuming processes
+
+  Get-EventLog -LogName Application -EntryType Error -Newest 20 |
+    Select TimeGenerated,Source,Message
+      ^ Last 20 application errors
+
+  typeperf "\Processor(_Total)\% Processor Time" -si 5 -sc 12 -o C:\cpu_log.csv
+      ^ Log CPU usage every 5 seconds for 60 seconds to CSV
+
+  perfmon /report                                                   Generate a 60-second system health report
+
+================================================================================
+  POWERSHELL REMOTING & AUTOMATION
+================================================================================
+
+  Enable-PSRemoting -Force                                          Enable PS Remoting on a machine
+  Set-Item WSMan:\localhost\Client\TrustedHosts -Value "10.0.0.*"   Trust a subnet for PS Remoting
+  Test-WSMan -ComputerName PC-NAME                                  Test if PS Remoting is working
+
+  $cred = Get-Credential                                            Prompt for and store credentials
+  New-PSSession -ComputerName PC1,PC2,PC3 -Credential $cred        Open sessions to multiple machines
+  Invoke-Command -Session $sessions -ScriptBlock { Get-Service }    Run command on all sessions
+
+  $computers = Get-ADComputer -Filter {OperatingSystem -like "*Windows 10*"} | Select -Expand Name
+  Invoke-Command -ComputerName $computers -ScriptBlock { gpupdate /force } -ThrottleLimit 10
+      ^ Force GP update on all Windows 10 machines (10 at a time)
+
+  Start-Transcript -Path C:\session_log.txt                         Start logging your PS session
+  Stop-Transcript                                                   Stop logging
+
+  Register-ScheduledTask -TaskName "DailyAudit" -Trigger (New-ScheduledTaskTrigger -Daily -At 6am) -Action (New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-File C:\scripts\audit.ps1") -User "SYSTEM" -RunLevel Highest
+      ^ Create a scheduled task to run a script daily at 6 AM
+
+================================================================================
+  SYSINTERNALS ESSENTIALS
+================================================================================
+
+  NOTE: Install with "winget install Sysinternals.Sysinternals" or download from
+        https://live.sysinternals.com — run from \\live.sysinternals.com\tools\
+
+  procexp                                                           Process Explorer (better Task Manager)
+  autoruns                                                          Show ALL auto-start locations (persistence)
+  tcpview                                                           Real-time TCP/UDP connection viewer
+  psexec \\PC-NAME cmd                                              Open remote command prompt
+  psexec \\PC-NAME -s cmd                                           Remote cmd as SYSTEM account
+  psexec \\PC-NAME -u domain\admin -p pass cmd                     Remote cmd with specific creds
+  PsLoggedOn \\PC-NAME                                              Who is logged onto a remote machine
+  PsService \\PC-NAME query servicename                             Query remote service
+  accesschk -uwcqv "Authenticated Users" *                          Check service permissions (priv esc check)
+  sigcheck -u -e C:\Windows\System32                                Find unsigned system files
+
+  WARNING: psexec is a legitimate admin tool but is also commonly used by
+  attackers. Your endpoint protection may flag it. Use PS Remoting when possible.
+
+================================================================================
+  QUICK INCIDENT RESPONSE COMMANDS
+================================================================================
+
+  Get-NetTCPConnection | Where {$_.State -eq "Established" -and $_.RemoteAddress -notlike "10.*" -and $_.RemoteAddress -notlike "192.168.*" -and $_.RemoteAddress -notlike "127.*"} | Select RemoteAddress,RemotePort,OwningProcess
+      ^ List established connections to external IPs
+
+  Get-Process -Id (Get-NetTCPConnection -RemotePort 443 -State Established).OwningProcess | Select Name,Id,Path
+      ^ What processes are making outbound HTTPS connections
+
+  Get-WinEvent -FilterHashtable @{LogName='Security';Id=4698} -MaxEvents 10
+      ^ Recently created scheduled tasks (persistence indicator)
+
+  Get-WinEvent -FilterHashtable @{LogName='Security';Id=4732} -MaxEvents 10
+      ^ Users added to local groups (privilege escalation indicator)
+
+  Get-WinEvent -FilterHashtable @{LogName='Security';Id=1102} -MaxEvents 5
+      ^ Audit log cleared events (cover-tracks indicator)
+
+  Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters" | Select EnableSecuritySignature,RequireSecuritySignature
+      ^ Check SMB signing configuration
+
+  Get-SmbServerConfiguration | Select EnableSMB1Protocol,EnableSMB2Protocol,RequireSecuritySignature,EncryptData
+      ^ Full SMB security configuration check
+
+  Get-WmiObject Win32_Process | Where {$_.ExecutablePath -notlike "C:\Windows\*" -and $_.ExecutablePath -ne $null} | Select Name,ExecutablePath,ProcessId
+      ^ Find processes running from non-standard locations
+
+================================================================================
+  NOTES
+================================================================================
